@@ -1,10 +1,14 @@
 from flask import Flask, request, jsonify
 import pdfplumber
+from flask_cors import CORS
+
 from openai import OpenAI
 import uuid
 import os
 
 app = Flask(__name__)
+CORS(app)
+
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2MB limit
 
 # Initialize OpenAI API key from environment variables
