@@ -19,16 +19,57 @@ client = OpenAI(api_key="")
 
 assistant = client.beta.assistants.create(
     name="legal contract analyst",
-    instructions="""You are a legal contract analyst. 
-                Summarize this construction contract and extract these key sections:
-                - Payment Terms
-                - Termination Clauses
-                - Variations
-                - Notifications
-                - Retention
-                Provide a concise summary followed by clear section details.""",
+    instructions="""Role: you are a contract law expert in the UK construction sector.
+                                Task: search the documents uploaded in order to answer each of the following questions
+                                Target Audience: non-technical construction professionals who do not have contract expertise
+                                Tone: use simple, direct, and everyday language that a layman could understand.
+                                Length of response:
+                                Identify what documents have been uploaded (e.g. contract, order, minutes, etc)
+                                Identify the form of contract (e.g. JCT 2016 Design & build, JCT intermediate 2016, etc)
+                                Payments
+                                - What are the payment terms
+                                - How long before the final due date for payment can a pay less notice be issued
+                                Termination
+                                - What are the clauses for termination
+                                - What costs are involved in termination
+                                Suspension
+                                - Under what circumstances can works be suspended? What notice is needed, and what needs to be included in the notification?
+                                - Can the subcontractor charge for resuming work after a suspension? If so, how much?
+                                -
+                                Variations
+                                - Summarise the clauses for variations
+                                - How long does the subcontractor have to submit a variation
+                                - Does the subcontractor have to get sign off before proceeding with a variation
+                                - Who can sign off variations
+                                - Is the subcontractor obliged to carry out variations without prior sign off or agreement from client
+                                - Under what circumstances can a variation be invalidated, or not paid for
+                                Day works
+                                - What are the daywork rates
+                                - What the daywork percentages
+                                - Do the day work rates include rates for supervisors, skilled labour, unskilled labour, and plant? If not, specify what is missing
+                                - How long does the subcontractor have to submit a variation
+                                Extensions of Time
+                                - What are the grounds for extension of time
+                                - Summarise what needs to be included in an Extension of Time submission
+                                Retention
+                                - What is the percentage of Retention held as a percentage?
+                                - If the contract sum is given, what value does this retention total?
+                                - How long is the defects period?
+                                - Does the defects period begin upon practical completion of the subcontractor works, or on practical completion of the main contract works?
+                                Adjudication
+                                - Does the subcontractor have the right to adjudication? (also known as ‘smash and grab’)
+                                - If yes, are the adjudicator fees fixed or capped?
+                                Entire Agreement Clause
+                                - Do the subcontractor tender documents form part of contract (or do the sub-contract docs and main contract constitute the entire agreement and supercede all others?)
+                                Programme
+                                - Given the duration of the programme and the contract sum, what is the value of work that needs to be completed on average per week?
+                                - Is the programme a numbered document?
+                                - What is the value of the Liquidated and ascertained damages (LAD's)?
+                                - Are the Liquidated and ascertained damages (LAD's)? greater than 1% of the agreed contract value for a maximum of 10 weeks?
+                                *and highlight the key risks in this contract""",
     tools=[{"type": "file_search"}],
     model="gpt-4o",
+    temperature=0.2,
 )
 
 
@@ -44,9 +85,59 @@ def generate_summary(assistant, vector_store):
             messages=[
                 {
                     "role": "user",
-                    "content": """Summarize the contract by addressing the user as user.
-                        Include key sections such as Payment Terms, Termination Clauses, Variations, Notifications, and Retention.
-                        Provide a concise summary followed by clear section details.""",
+                    "content": """Role: you are a contract law expert in the UK construction sector.
+                                Task: search the documents uploaded in order to answer each of the following questions
+                                Target Audience: non-technical construction professionals who do not have contract expertise
+                                Tone: use simple, direct, and everyday language that a layman could understand.
+                                Length of response:
+                                Identify what documents have been uploaded (e.g. contract, order, minutes, etc)
+                                Identify the form of contract (e.g. JCT 2016 Design & build, JCT intermediate 2016, etc)
+                                Payments
+                                - What are the payment terms
+                                - How long before the final due date for payment can a pay less notice be issued
+                                Termination
+                                - What are the clauses for termination
+                                - What costs are involved in termination
+                                Suspension
+                                - Under what circumstances can works be suspended? What notice is needed, and what needs to be included in the notification?
+                                - Can the subcontractor charge for resuming work after a suspension? If so, how much?
+                                -
+                                Variations
+                                - Summarise the clauses for variations
+                                - How long does the subcontractor have to submit a variation
+                                - Does the subcontractor have to get sign off before proceeding with a variation
+                                - Who can sign off variations
+                                - Is the subcontractor obliged to carry out variations without prior sign off or agreement from client
+                                - Under what circumstances can a variation be invalidated, or not paid for
+                                Day works
+                                - What are the daywork rates
+                                - What the daywork percentages
+                                - Do the day work rates include rates for supervisors, skilled labour, unskilled labour, and plant? If not, specify what is missing
+                                - How long does the subcontractor have to submit a variation
+                                Extensions of Time
+                                - What are the grounds for extension of time
+                                - Summarise what needs to be included in an Extension of Time submission
+                                Retention
+                                - What is the percentage of Retention held as a percentage?
+                                - If the contract sum is given, what value does this retention total?
+                                - How long is the defects period?
+                                - Does the defects period begin upon practical completion of the subcontractor works, or on practical completion of the main contract works?
+                                Adjudication
+                                - Does the subcontractor have the right to adjudication? (also known as ‘smash and grab’)
+                                - If yes, are the adjudicator fees fixed or capped?
+                                Entire Agreement Clause
+                                - Do the subcontractor tender documents form part of contract (or do the sub-contract docs and main contract constitute the entire agreement and supercede all others?)
+                                Programme
+                                - Given the duration of the programme and the contract sum, what is the value of work that needs to be completed on average per week?
+                                - Is the programme a numbered document?
+                                - What is the value of the Liquidated and ascertained damages (LAD's)?
+                                - Are the Liquidated and ascertained damages (LAD's)? greater than 1% of the agreed contract value for a maximum of 10 weeks?
+                                *and highlight the key risks in this contract""",
+
+
+                    # Summarize the contract by addressing the user as user.
+                    #     Include key sections such as Payment Terms, Termination Clauses, Variations, Notifications, and Retention.
+                    #     Provide a concise summary followed by clear section details.
                     # Attach the new file to the message.
                     # "attachments": [
                     #   { "file_id": message_file.id, "tools": [{"type": "file_search"}] }
@@ -120,7 +211,7 @@ def generate_answer(contract_text, question):
                 Answer questions based strictly on the contract file:
                 If information isn't in the contract, say so. 
                 If the user asks any question not in the contract, 
-                say so explicitly and then you can answer to the best of your knowledge."""
+                say so explicitly and then you can answer to the best of your knowledge. """
         )
         # ,max_completion_tokens=1500
 
