@@ -243,9 +243,10 @@ def upload_file():
         vectordb.add_documents(texts)
         vectordb.persist()
 
-        # global retriever
-        # retriever = vectordb.as_retriever(
-        #     search_kwargs={"k": min(1, num_docs)})
+        global retriever
+        num_docs = len(vectordb.get()["documents"])
+        retriever = vectordb.as_retriever(
+            search_kwargs={"k":  min(1, num_docs)})
 
         contract_id = str(uuid.uuid4())
         get_message_history(contract_id)  # Initialize history
