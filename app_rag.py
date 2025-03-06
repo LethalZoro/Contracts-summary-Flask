@@ -191,20 +191,20 @@ chain_with_history_chat = RunnableWithMessageHistory(
 # Background task to clean up old sessions
 
 
-def cleanup_old_sessions():
-    while True:
-        now = datetime.now()
-        for contract_id, creation_time in list(session_creation_times.items()):
-            if now - creation_time > timedelta(hours=1):  # 1-hour expiration
-                del message_histories[contract_id]
-                del session_creation_times[contract_id]
-        time.sleep(3600)  # Run every hour
+# def cleanup_old_sessions():
+#     while True:
+#         now = datetime.now()
+#         for contract_id, creation_time in list(session_creation_times.items()):
+#             if now - creation_time > timedelta(hours=1):  # 1-hour expiration
+#                 del message_histories[contract_id]
+#                 del session_creation_times[contract_id]
+#         time.sleep(3600)  # Run every hour
 
 
-# Start the cleanup task in a separate thread
-threading.Thread(target=cleanup_old_sessions, daemon=True).start()
+# # Start the cleanup task in a separate thread
+# threading.Thread(target=cleanup_old_sessions, daemon=True).start()
 
-# Endpoints
+# # Endpoints
 
 
 @app.route('/upload', methods=['POST'])
