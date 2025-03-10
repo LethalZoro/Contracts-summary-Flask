@@ -245,6 +245,10 @@ def upload_file():
 
         global retriever
         num_docs = len(vectordb.get()["documents"])
+        if num_docs == 0:
+            return jsonify({"error": "No documents have been uploaded or processed."}), 400
+        retriever = vectordb.as_retriever(search_kwargs={"k": 1})
+
         retriever = vectordb.as_retriever(
             search_kwargs={"k":  min(1, num_docs)})
 
