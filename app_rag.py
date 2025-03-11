@@ -30,21 +30,19 @@ text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=2000, chunk_overlap=300)
 
 
-def get_vectordb(contract_id: str):
-    """
-    Get or create a unique vector database for the given contract_id.
-    """
-    persist_directory = os.path.join("vector_store", contract_id)
-    if os.path.exists(persist_directory):
-        return Chroma(
-            persist_directory=persist_directory,
-            embedding_function=embedding
-        )
-    else:
-        return Chroma(
-            embedding_function=embedding,
-            persist_directory=persist_directory
-        )
+persist_directory = "vector_store"
+embedding = OpenAIEmbeddings(model="text-embedding-3-small")
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=2000, chunk_overlap=300)
+
+# Initialize Chroma vector store
+vectordb = Chroma(
+    persist_directory=persist_directory,
+    embedding_function=embedding
+) if os.path.exists(persist_directory) else Chroma(
+    embedding_function=embedding,
+    persist_directory=persist_directory
+)
 
 
 def format_docs(docs):
@@ -56,8 +54,7 @@ def print_me(x):
     return x
 
 
-def get_retriever(contract_id: str):
-    vectordb = get_vectordb(contract_id)
+def get_retriever():
     num_docs = len(vectordb.get()["documents"])
     if num_docs == 0:
         return None  # or handle appropriately
@@ -159,10 +156,10 @@ prompt_chat = ChatPromptTemplate.from_messages([
 chain_summary = (
     {
         # Fixed line
-        "context": lambda d: format_docs(
-            get_retriever(d.get("contract_id", "default_contract_id")).invoke(
-                d["question"])
-        ),
+        "context": itemgetter("question")
+        # Fixed line
+        | RunnableLambda(lambda question: get_retriever().invoke(question))
+        | format_docs,
         "question": itemgetter("question"),
         "history": itemgetter("history"),
     }
@@ -174,10 +171,10 @@ chain_summary = (
 
 chain_chat = (
     {
-        "context": lambda d: format_docs(
-            get_retriever(d.get("contract_id", "default_contract_id")).invoke(
-                d["question"])
-        ),
+        "context": itemgetter("question")
+        # Fixed line
+        | RunnableLambda(lambda question: get_retriever().invoke(question))
+        | format_docs,
         "question": itemgetter("question"),
         "history": itemgetter("history"),
     }
@@ -250,7 +247,7 @@ def upload_file():
             doc.metadata["contract_id"] = contract_id
 
         # Add to a unique vector database for this contract
-        vectordb = get_vectordb(contract_id)
+        # vectordb = get_vectordb(contract_id)
         vectordb.add_documents(texts)
         vectordb.persist()
 
@@ -270,14 +267,6 @@ def upload_file():
         return jsonify({"contract_id": contract_id, "summary": summary}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)  # Delete the file
-            print(f"Deleted temporary file for contract {contract_id}")
-
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)  # Delete the directory
-            print(f"Deleted temporary directory for contract {contract_id}")
 
 
 @app.route('/chat', methods=['POST'])
@@ -287,7 +276,7 @@ def handle_chat():
         return jsonify({"error": "Missing question or contract_id"}), 400
 
     contract_id = data['contract_id']
-    vectordb = get_vectordb(contract_id)
+    # vectordb = get_vectordb(contract_id)
 
     # Check if the vector store is empty
     if len(vectordb.get()["documents"]) == 0:
