@@ -16,26 +16,39 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import threading
 import time
+import shutil
+from langchain_core.runnables import RunnableLambda
+
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Initialize components
-persist_directory = "vector_store"
 embedding = OpenAIEmbeddings(model="text-embedding-3-small")
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=2000, chunk_overlap=300)
 
-# Initialize Chroma vector store
-vectordb = Chroma(
-    persist_directory=persist_directory,
-    embedding_function=embedding
-) if os.path.exists(persist_directory) else Chroma(
-    embedding_function=embedding,
-    persist_directory=persist_directory
-)
+
+def get_vectordb(contract_id: str):
+    """
+    Get or create a unique vector database for the given contract_id.
+    """
+    persist_directory = os.path.join("vector_store", contract_id)
+    if os.path.exists(persist_directory):
+        return Chroma(
+            persist_directory=persist_directory,
+            embedding_function=embedding
+        )
+    else:
+        return Chroma(
+            embedding_function=embedding,
+            persist_directory=persist_directory
+        )
+
+
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
 
 
 def print_me(x):
@@ -43,9 +56,13 @@ def print_me(x):
     return x
 
 
-# Dynamic k value for retriever
-num_docs = len(vectordb.get()["documents"])
-retriever = vectordb.as_retriever(search_kwargs={"k": min(1, num_docs)})
+def get_retriever(contract_id: str):
+    vectordb = get_vectordb(contract_id)
+    num_docs = len(vectordb.get()["documents"])
+    if num_docs == 0:
+        return None  # or handle appropriately
+    return vectordb.as_retriever(search_kwargs={"k": 2})
+
 
 # LLM and prompt
 llm = ChatOpenAI(model="gpt-4o")
@@ -103,25 +120,25 @@ Summary_prompt = """
                 - What is the value of the Liquidated and ascertained damages (LAD's)?
                 - Are the Liquidated and ascertained damages (LAD's)? greater than 1% of the agreed contract value for a maximum of 10 weeks?
                 *and highlight the key risks in this contract.
-                
+
                 Questions:
                 {question}
                 """
 
 
-chat_prompt = """ 
+chat_prompt = """
                 History:
                 {history}
                 Context:
                 {context}
-                
-                You are a legal contract assistant. 
+
+                You are a legal contract assistant.
                 Use strictly the above pieces of retrieved context to answer the question.
-                If information isn't in the contract, say so. 
-                If the user asks any question not in the contract, 
+                If information isn't in the contract, say so.
+                If the user asks any question not in the contract,
                 say so explicitly and then you can answer to the best of your knowledge.
                 Also keep in mind the history of the conversation.
-                
+
                 Question:
                 {question}"""
 
@@ -141,7 +158,11 @@ prompt_chat = ChatPromptTemplate.from_messages([
 
 chain_summary = (
     {
-        "context": itemgetter("question") | retriever | (lambda docs: "\n\n".join(doc.page_content for doc in docs)),
+        # Fixed line
+        "context": lambda d: format_docs(
+            get_retriever(d.get("contract_id", "default_contract_id")).invoke(
+                d["question"])
+        ),
         "question": itemgetter("question"),
         "history": itemgetter("history"),
     }
@@ -153,7 +174,10 @@ chain_summary = (
 
 chain_chat = (
     {
-        "context": itemgetter("question") | retriever | (lambda docs: "\n\n".join(doc.page_content for doc in docs)),
+        "context": lambda d: format_docs(
+            get_retriever(d.get("contract_id", "default_contract_id")).invoke(
+                d["question"])
+        ),
         "question": itemgetter("question"),
         "history": itemgetter("history"),
     }
@@ -188,27 +212,10 @@ chain_with_history_chat = RunnableWithMessageHistory(
     history_messages_key="history",
 )
 
-# Background task to clean up old sessions
-
-
-# def cleanup_old_sessions():
-#     while True:
-#         now = datetime.now()
-#         for contract_id, creation_time in list(session_creation_times.items()):
-#             if now - creation_time > timedelta(hours=1):  # 1-hour expiration
-#                 del message_histories[contract_id]
-#                 del session_creation_times[contract_id]
-#         time.sleep(3600)  # Run every hour
-
-
-# # Start the cleanup task in a separate thread
-# threading.Thread(target=cleanup_old_sessions, daemon=True).start()
-
-# # Endpoints
-
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    cwd = os.getcwd()
     if 'file' not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
@@ -219,16 +226,14 @@ def upload_file():
     if not file.filename.lower().endswith('.pdf'):
         return jsonify({"error": "Only PDF files accepted"}), 400
 
-    # summary_prompt = request.form.get("summary_prompt")
-    # # print(summary_prompt)
-    # if not summary_prompt:
-    #     return jsonify({"error": "Please provide a summary prompt"}), 400
-
     try:
         # Save and process PDF
-        temp_dir = "temp_uploads"
+        contract_id = str(uuid.uuid4())
+
+        temp_dir = os.path.join("temp_uploads", contract_id)
         os.makedirs(temp_dir, exist_ok=True)
         temp_path = os.path.join(temp_dir, file.filename)
+        print(temp_path)
         file.save(temp_path)
 
         # Validate file size (optional)
@@ -239,40 +244,40 @@ def upload_file():
         documents = loader.load()
         texts = text_splitter.split_documents(documents)
 
-        # Add to vector store
+        for doc in texts:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata["contract_id"] = contract_id
+
+        # Add to a unique vector database for this contract
+        vectordb = get_vectordb(contract_id)
         vectordb.add_documents(texts)
         vectordb.persist()
 
-        global retriever
-        num_docs = len(vectordb.get()["documents"])
-        if num_docs == 0:
-            return jsonify({"error": "No documents have been uploaded or processed."}), 400
-        retriever = vectordb.as_retriever(search_kwargs={"k": 1})
-
-        retriever = vectordb.as_retriever(
-            search_kwargs={"k":  min(1, num_docs)})
-
-        contract_id = str(uuid.uuid4())
         get_message_history(contract_id)  # Initialize history
         session_creation_times[contract_id] = datetime.now()
 
-        # generate summary
+        # Generate summary
         try:
             summary = chain_with_history_summary.invoke(
-                {"question": Summary_prompt},
+                {"question": Summary_prompt, "contract_id": contract_id},
                 config={"configurable": {"session_id": contract_id}}
             )
 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-        return jsonify({"contract_id": contract_id,
-                        "summary": summary}), 200
+        return jsonify({"contract_id": contract_id, "summary": summary}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         if os.path.exists(temp_path):
-            os.remove(temp_path)
+            os.remove(temp_path)  # Delete the file
+            print(f"Deleted temporary file for contract {contract_id}")
+
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)  # Delete the directory
+            print(f"Deleted temporary directory for contract {contract_id}")
 
 
 @app.route('/chat', methods=['POST'])
@@ -281,29 +286,23 @@ def handle_chat():
     if not data or 'question' not in data or 'contract_id' not in data:
         return jsonify({"error": "Missing question or contract_id"}), 400
 
+    contract_id = data['contract_id']
+    vectordb = get_vectordb(contract_id)
+
     # Check if the vector store is empty
     if len(vectordb.get()["documents"]) == 0:
-        return jsonify({"error": "No documents have been uploaded yet. Please upload documents first."}), 400
+        return jsonify({"error": "No documents found for this contract"}), 400
 
     try:
         response = chain_with_history_chat.invoke(
-            {"question": data['question']},
-            config={"configurable": {"session_id": data['contract_id']}}
+            {"question": data['question'], "contract_id": contract_id},
+            config={"configurable": {"session_id": contract_id}}
         )
+
         return jsonify({"answer": response}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# @app.route('/history/<contract_id>', methods=['GET'])
-# def get_history(contract_id):
-#     history = message_histories.get(contract_id)
-#     if not history:
-#         return jsonify({"error": "Session not found"}), 404
-
-#     messages = [{"type": msg.type, "content": msg.content}
-#                 for msg in history.messages]
-#     return jsonify({"messages": messages}), 200
 
 @app.route('/contracts', methods=['GET'])
 def get_contracts():
@@ -322,15 +321,5 @@ def get_contracts():
     return jsonify(contracts_list), 200
 
 
-# @app.route('/status', methods=['GET'])
-# def get_status():
-#     vector_store_info = vectordb.get()
-#     return jsonify({
-#         "num_documents": len(vector_store_info["documents"]),
-#         "num_chunks": len(vector_store_info["embeddings"]),
-#         "persist_directory": persist_directory
-#     }), 200
-
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
