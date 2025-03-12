@@ -292,6 +292,10 @@ def upload_file():
 
         # Generate summary
         try:
+            context_docs = get_retriever(contract_id).invoke(
+                "Generate a full contract breakdown covering all sections...")
+            ("Retrieved Documents: ", [
+                doc.page_content for doc in context_docs])
             summary = chain_with_history_summary.invoke(
                 {"question": "Generate a full contract breakdown covering all sections...",
                     "contract_id": contract_id},
