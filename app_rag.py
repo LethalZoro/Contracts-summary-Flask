@@ -25,15 +25,15 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-embedding = OpenAIEmbeddings(model="text-embedding-3-small")
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=2000, chunk_overlap=300)
+# embedding = OpenAIEmbeddings(model="text-embedding-3-small")
+# text_splitter = RecursiveCharacterTextSplitter(
+#     chunk_size=4000, chunk_overlap=300)
 
 
 persist_directory = "vector_store"
 embedding = OpenAIEmbeddings(model="text-embedding-3-small")
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=2000, chunk_overlap=300)
+    chunk_size=4000, chunk_overlap=300)
 
 # Initialize Chroma vector store
 vectordb = Chroma(
@@ -62,7 +62,7 @@ def get_retriever(contract_id):
 
 
 # LLM and prompt
-llm = ChatOpenAI(model="gpt-4o")
+llm = ChatOpenAI(model="o3-mini")
 
 Summary_prompt = """
                 History:
@@ -292,10 +292,10 @@ def upload_file():
 
         # Generate summary
         try:
-            context_docs = get_retriever(contract_id).invoke(
-                "Generate a full contract breakdown covering all sections...")
-            ("Retrieved Documents: ", [
-                doc.page_content for doc in context_docs])
+            # context_docs = get_retriever(contract_id).invoke(
+            #     "Generate a full contract breakdown covering all sections...")
+            # print("Retrieved Documents: ", [
+            #     doc.page_content for doc in context_docs])
             summary = chain_with_history_summary.invoke(
                 {"question": "Generate a full contract breakdown covering all sections...",
                     "contract_id": contract_id},
@@ -328,9 +328,9 @@ def handle_chat():
             {"question": data['question'], "contract_id": contract_id},
             config={"configurable": {"session_id": contract_id}}
         )
-        context_docs = get_retriever(contract_id).invoke(data['question'])
-        print("Retrieved Documents: ", [
-              doc.page_content for doc in context_docs])
+        # context_docs = get_retriever(contract_id).invoke(data['question'])
+        # print("Retrieved Documents: ", [
+        #   doc.page_content for doc in context_docs])
 
         return jsonify({"answer": response}), 200
     except Exception as e:
