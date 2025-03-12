@@ -58,7 +58,7 @@ def get_retriever():
     num_docs = len(vectordb.get()["documents"])
     if num_docs == 0:
         return None  # or handle appropriately
-    return vectordb.as_retriever(search_kwargs={"k": 2})
+    return vectordb.as_retriever(search_kwargs={"k": 15})
 
 
 # LLM and prompt
