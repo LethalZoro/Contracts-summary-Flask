@@ -33,7 +33,7 @@ CORS(app)
 persist_directory = "vector_store"
 embedding = OpenAIEmbeddings(model="text-embedding-3-small")
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=4000, chunk_overlap=300)
+    chunk_size=2500, chunk_overlap=300)
 
 # Initialize Chroma vector store
 vectordb = Chroma(
@@ -62,7 +62,7 @@ def get_retriever(contract_id):
 
 
 # LLM and prompt
-llm = ChatOpenAI(model="o3-mini")
+llm = ChatOpenAI(model="gpt-4o")
 
 Summary_prompt = """
                 History:
