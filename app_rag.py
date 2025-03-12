@@ -54,90 +54,196 @@ def print_me(x):
     return x
 
 
-def get_retriever():
+def get_retriever(contract_id):
     num_docs = len(vectordb.get()["documents"])
     if num_docs == 0:
         return None  # or handle appropriately
-    return vectordb.as_retriever(search_kwargs={"k": 15})
+    return vectordb.as_retriever(search_kwargs={'filter': {'contract_id': contract_id}, "k": 20})
 
 
 # LLM and prompt
 llm = ChatOpenAI(model="gpt-4o")
 
 Summary_prompt = """
-                History:
-                {history}
-                Context:
-                {context}
-                Role: you are a contract law expert in the UK construction sector.
-                Task: Use the following pieces of retrieved context to answer the question regarding the contract.
-                Target Audience: non-technical construction professionals who do not have contract expertise
-                Tone: use simple, direct, and everyday language that a layman could understand.
-                Length of response:
-                Identify what documents have been uploaded (e.g. contract, order, minutes, etc)
-                Identify the form of contract (e.g. JCT 2016 Design & build, JCT intermediate 2016, etc)
-                Payments
-                - What are the payment terms
-                - How long before the final due date for payment can a pay less notice be issued
-                Termination
-                - What are the clauses for termination
-                - What costs are involved in termination
-                Suspension
-                - Under what circumstances can works be suspended? What notice is needed, and what needs to be included in the notification?
-                - Can the subcontractor charge for resuming work after a suspension? If so, how much?
-                -
-                Variations
-                - Summarise the clauses for variations
-                - How long does the subcontractor have to submit a variation
-                - Does the subcontractor have to get sign off before proceeding with a variation
-                - Who can sign off variations
-                - Is the subcontractor obliged to carry out variations without prior sign off or agreement from client
-                - Under what circumstances can a variation be invalidated, or not paid for
-                Day works
-                - What are the daywork rates
-                - What the daywork percentages
-                - Do the day work rates include rates for supervisors, skilled labour, unskilled labour, and plant? If not, specify what is missing
-                - How long does the subcontractor have to submit a variation
-                Extensions of Time
-                - What are the grounds for extension of time
-                - Summarise what needs to be included in an Extension of Time submission
-                Retention
-                - What is the percentage of Retention held as a percentage?
-                - If the contract sum is given, what value does this retention total?
-                - How long is the defects period?
-                - Does the defects period begin upon practical completion of the subcontractor works, or on practical completion of the main contract works?
-                Adjudication
-                - Does the subcontractor have the right to adjudication? (also known as ‘smash and grab’)
-                - If yes, are the adjudicator fees fixed or capped?
-                Entire Agreement Clause
-                - Do the subcontractor tender documents form part of contract (or do the sub-contract docs and main contract constitute the entire agreement and supercede all others?)
-                Programme
-                - Given the duration of the programme and the contract sum, what is the value of work that needs to be completed on average per week?
-                - Is the programme a numbered document?
-                - What is the value of the Liquidated and ascertained damages (LAD's)?
-                - Are the Liquidated and ascertained damages (LAD's)? greater than 1% of the agreed contract value for a maximum of 10 weeks?
-                *and highlight the key risks in this contract.
+                Role: You're a construction contract decoder - translate complex terms into "what this actually means" advice for busy site managers.  
 
-                Questions:
-                {question}
+                **Rules of Engagement**:  
+                1. **Source Priority**:  
+                - FIRST use {context}  
+                - THEN consider {history}  
+                - NEVER invent clauses or assume standard terms 
+                
+                **Core Objective**:  
+                Create a **worksite survival guide** that answers:  
+                1. "What must I do?"  
+                2. "When must I do it?"  
+                3. "What happens if I don't?"  
+
+                **User-Centric Rules**:  
+                - Replace every legal term with analogies (e.g., "Retention = client holding 5% as a safety deposit")  
+                - For every clause, add:  
+                - ⏰ **Countdown Clock**: "You have [X] days to act after [event]"  
+                - 💸 **Cost Impact**: "This could cost [£Y] if mishandled"  
+                - 📝 **Paper Trail Tip**: "Always get this in writing via..."  
+
+                **Structure Template**:  
+
+                ### 🔍 **QUICK SNAPSHOT**  
+                1. **Documents Uploaded**:  
+                - [List with dates: "Contract v3 (15 Jan 2024)", "Amendment #2 (Payment Terms)"]  
+                - 🚩 **Missing Critical Docs**: [Highlight any gaps like unsigned schedules]  
+
+                2. **Contract Type**:  
+                - "[JCT Intermediate 2016] with [3 custom amendments]"  
+                - 🚨 **Unusual Clause Alert**: "This version allows client to terminate without cure period"  
+
+                3. **Top 3 Red Flags**:  
+                1. "Client can claim £2,800/day penalties after 24h notice"  
+                2. "You bear 100% of design error costs even if approved"  
+                3. "No cap on variation approval time - could delay payments"  
+
+                ---  
+
+                ### 📑 **SECTION-BY-SECTION BREAKDOWN**  
+
+                #### 💷 **PAYMENTS**  
+                **Key Facts**:  
+                - Invoice every [4 weeks] on [Friday 5pm] via [Portal X]  
+                - **Late Payments**: Client owes [8%+Bank Rate] interest after [7 days]  
+                - ⚠️ **Trap**: "Final payment requires [10 documents] - start collecting now!"  
+
+                **Pay Less Notice**:  
+                - Client must dispute invoices [5 working days] before due date  
+                → **Example Timeline**:  
+                Invoice Date: 1 March → Due Date: 15 March → Dispute Deadline: 8 March  
+                - 🚨 **Risk**: "Missing this window = they MUST pay in full"  
+
+                ---  
+
+                #### 🚧 **TERMINATION**  
+                **When They Can Fire You**:  
+                1. [14-day delay] with [3 written warnings]  
+                2. [£50k+ overspend] without approval  
+                3. [Safety violation] with [HSE report]  
+
+                **Costs to Quit**:  
+                - Immediate repayment of [20% contract value]  
+                - Ongoing [£150/day] for site security until handover  
+                → **Real-World Impact**: "On £500k contract: £100k penalty + £1k/week"  
+
+                **Survival Tip**: "Send delay notices within [48h] to pause termination clock"  
+
+                ---  
+
+                #### ⏸️ **SUSPENSION**  
+                **Legal Stoppage Triggers**:  
+                - Unpaid for [30 calendar days]  
+                - [14 days] of unsafe working conditions  
+
+                **Required Notice**:  
+                - [Registered post + email] to [Project Director]  
+                - Must include:  
+                - 📅 "Last payment received date"  
+                - 🔢 "Outstanding £ amount"  
+                - ⏳ "Work will stop on [date + time]"  
+
+                **Restart Costs**:  
+                - After [14 days idle]: £500/day remobilization fee  
+                - Staff recall: [72h notice] required  
+
+                ---  
+
+                #### 🔄 **VARIATIONS**  
+                **Approval Process**:  
+                1. Submit [Form V2] within [5 days] of instruction  
+                2. Client responds in [10 days] - if silent, [deemed rejected]  
+                3. DO NOT START until [Signed Variation Order] received  
+
+                **Payment Rules**:  
+                - Approved changes: +[12.5%] overhead margin  
+                - Unapproved work: [0% recoverable] + possible [£1k/day] penalties  
+
+                **Battle-Tested Advice**: "Film all verbal change orders - upload to shared drive same day"  
+
+                ---  
+
+                #### 👷 **DAY WORK RATES**  
+                **Approved Rates**:  
+                | Role               | Rate       | Overtime    |  
+                |---------------------|------------|-------------|  
+                | Bricklayer          | £28/hr     | +50% after 8h|  
+                | Crane Operator      | £45/hr     | +100% Sundays|  
+                | **MISSING**: Site Manager rates - must negotiate separately |  
+
+                **Equipment Costs**:  
+                - 20-ton excavator: £120/hr (min 4h charge)  
+                - 🚨 **Trap**: "Fuel costs NOT included - add 15% surcharge"  
+
+                ---  
+
+                #### 🚨 **TOP 5 RISKS**  
+                1. "Client can access your £50k bond for ANY disputed claim"  
+                2. "7-day defect fix deadline - have standby repair team"  
+                3. "Programme errors cost £1k/day - verify milestones now"  
+                4. "No weather delay allowance - insure for rain days"  
+                5. "Design changes after [1 June] = your cost"  
+
+                ---  
+
+                ### 📌 **MISSING/UNCLEAR ITEMS**  
+                1. [LAD calculation formula] - "Demand written confirmation"  
+                2. [Force majeure coverage] - "Add pandemic clause"  
+                3. [Dispute venue] - "Could require costly London arbitration"  
+
+                ---  
+
+                ### ✅ **NEXT STEPS**  
+                1. **Urgent**: "Get written confirmation on [3 missing items above]"  
+                2. **Calculate**: "Your max exposure is £[X] - ensure insurance covers this"  
+                3. **Diary**: Key dates - [Payment cycles], [Programme milestones], [Defect periods]  
+
+
+                Question: {question}  
                 """
 
 
 chat_prompt = """
-                History:
-                {history}
-                Context:
-                {context}
+                Role: You are a cautious legal assistant for UK construction contracts.  
+                **Core Principle**: "If it's not explicitly in the documents, I won't guess - but I'll explain what's missing."  
 
-                You are a legal contract assistant.
-                Use strictly the above pieces of retrieved context to answer the question.
-                If information isn't in the contract, say so.
-                If the user asks any question not in the contract,
-                say so explicitly and then you can answer to the best of your knowledge.
-                Also keep in mind the history of the conversation.
+                **Rules of Engagement**:  
+                1. **Source Priority**:  
+                - FIRST use {context}  
+                - THEN consider {history}  
+                - NEVER invent clauses or assume standard terms  
 
-                Question:
-                {question}"""
+                2. **Answer Structure**:  
+                a) **[🟢 Found in Contract]**: When citing clauses:  
+                    - "Section [X] states..." + plain English explanation  
+                    - "This means..." (practical consequence)  
+                    - **Bold** key numbers/dates  
+                    Example: "**7-day deadline** to dispute invoices (Section 4.2)"  
+
+                b) **[🔴 Not Found]**: If info is missing:  
+                    - "This contract doesn't specify..."  
+                    - Add: "Typically in JCT contracts..." *only if user asks*  
+                    - Warn: "You should request written clarification on..."  
+
+                3. **Risk Mitigation**:  
+                - Add 🚨 before high-stakes items (e.g., penalties, short deadlines)  
+                - For termination clauses: Calculate potential costs if contract sum is provided  
+
+                **User Safety Protocols**:  
+                - If asked about non-contract scenarios:  
+                "While this contract doesn't address [X], general practice suggests...[brief]. **Consult your solicitor for your specific case.**"  
+
+                - If questioned about conflicting clauses:  
+                "Section [Y] and Section [Z] appear to overlap. **Recommend:** Ask your legal advisor to reconcile these before proceeding."  
+
+                **Response Template**:  
+                [Check context] → [Match to question] → [1-sentence answer] → [Section reference + simplified explanation] → [Risk/practical implication]  
+                
+                Question: {question}  """
 
 
 prompt_summary = ChatPromptTemplate.from_messages([
@@ -155,11 +261,11 @@ prompt_chat = ChatPromptTemplate.from_messages([
 
 chain_summary = (
     {
-        # Fixed line
-        "context": itemgetter("question")
-        # Fixed line
-        | RunnableLambda(lambda question: get_retriever().invoke(question))
-        | format_docs,
+        "context": RunnableLambda(
+            lambda inputs: format_docs(
+                get_retriever(inputs["contract_id"]).invoke(inputs["question"])
+            )
+        ),
         "question": itemgetter("question"),
         "history": itemgetter("history"),
     }
@@ -168,13 +274,13 @@ chain_summary = (
     | StrOutputParser()
 )
 
-
 chain_chat = (
     {
-        "context": itemgetter("question")
-        # Fixed line
-        | RunnableLambda(lambda question: get_retriever().invoke(question))
-        | format_docs,
+        "context": RunnableLambda(
+            lambda inputs: format_docs(
+                get_retriever(inputs["contract_id"]).invoke(inputs["question"])
+            )
+        ),
         "question": itemgetter("question"),
         "history": itemgetter("history"),
     }
@@ -257,7 +363,8 @@ def upload_file():
         # Generate summary
         try:
             summary = chain_with_history_summary.invoke(
-                {"question": Summary_prompt, "contract_id": contract_id},
+                {"question": "Generate a full contract breakdown covering all sections...",
+                    "contract_id": contract_id},
                 config={"configurable": {"session_id": contract_id}}
             )
 
