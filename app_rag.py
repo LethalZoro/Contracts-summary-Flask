@@ -273,6 +273,8 @@ def upload_file():
 
         loader = PyPDFLoader(temp_path)
         documents = loader.load()
+        if not documents:
+            return jsonify({"error": "PDF text extraction failed - document may be scanned or encrypted"}), 400
         texts = text_splitter.split_documents(documents)
 
         for doc in texts:
@@ -322,6 +324,9 @@ def handle_chat():
             {"question": data['question'], "contract_id": contract_id},
             config={"configurable": {"session_id": contract_id}}
         )
+        context_docs = get_retriever(contract_id).invoke(data['question'])
+        print("Retrieved Documents: ", [
+              doc.page_content for doc in context_docs])
 
         return jsonify({"answer": response}), 200
     except Exception as e:
