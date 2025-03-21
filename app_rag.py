@@ -145,7 +145,8 @@ chat_prompt = """
                 {context}
 
                 Role: you are a contract law expert in the UK construction sector.
-                Task: The documents has been searched and given the context answer the following question.
+                Task: search the documents uploaded in order to answer each of the following 
+                questions
                 Target Audience: non-technical construction professionals who do not have 
                 contract expertise
                 Party you are representing:
